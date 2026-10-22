@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Country Tournament · Scoreboard</title>
+<style>
+  :root {
+    --bg: #0b0f17;
+    --panel: #131a26;
+    --panel-2: #1a2333;
+    --line: #26324a;
+    --text: #e8eefc;
+    --muted: #8fa2c4;
+    --accent: #37e0a0;
+    --accent-2: #3aa0ff;
+    --danger: #ff5d6c;
+    --ok: #37e0a0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 20% -10%, #16233b 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 20px 16px 64px; }
+
+  header.top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; padding: 8px 2px 18px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand .mark {
+    width: 40px; height: 40px; border-radius: 11px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center; font-weight: 800; color: #04121a; font-size: 20px;
+  }
+  .brand h1 { font-size: 18px; margin: 0; letter-spacing: .2px; }
+  .brand p  { font-size: 12.5px; margin: 0; color: var(--muted); }
+
+  .badge {
+    font-size: 12.5px; font-weight: 600; padding: 8px 12px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--panel);
+    display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+  }
+  .badge .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .badge.ok  { color: var(--ok); border-color: #1c4a3b; background: #0f1f1a; }
+  .badge.ok .dot { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .badge.bad { color: var(--danger); border-color: #5a2730; background: #241116; }
+  .badge.bad .dot { background: var(--danger); }
+
+  /* ---- tabs ---- */
+  .tabs { display: flex; gap: 8px; margin: 4px 0 14px; }
+  .tab {
+    flex: 1; padding: 12px 14px; border-radius: 12px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel); color: var(--muted);
+    font-size: 14px; font-weight: 700; letter-spacing: .02em;
+  }
+  .tab.active { color: var(--text); border-color: var(--accent-2); background: #16233b; box-shadow: inset 0 0 0 1px rgba(58,160,255,.25); }
+  .tab.active .n { color: var(--accent); }
+  .tab .n { font-size: 11px; display: block; font-weight: 600; }
+
+  section.card {
+    background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+    border: 1px solid var(--line); border-radius: 16px; padding: 18px;
+    margin: 14px 0; box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  }
+  section.card h2 {
+    font-size: 13px; margin: 0 0 14px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted); font-weight: 700;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+
+  .round {
+    border: 1px solid var(--line); border-radius: 12px; padding: 12px;
+    background: rgba(255,255,255,.02);
+  }
+  .round .rlabel { font-size: 12px; color: var(--accent-2); font-weight: 700; margin-bottom: 8px; letter-spacing: .05em; }
+  .match { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid rgba(255,255,255,.05); }
+  .match:first-of-type { border-top: 0; }
+  .match .team { flex: 1; font-size: 14px; font-weight: 600; }
+  .match .vs   { font-size: 11px; color: var(--muted); letter-spacing: .1em; }
+
+  .team-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 0; border-top: 1px solid rgba(255,255,255,.05); }
+  .team-row:first-child { border-top: 0; }
+  .team-row .name { font-weight: 700; font-size: 14px; min-width: 96px; }
+  .chip { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: rgba(58,160,255,.14); color: #bcd8ff; border: 1px solid rgba(58,160,255,.35); }
+  .chip b { color: var(--accent); }
+
+  .stats { display: flex; flex-wrap: wrap; gap: 10px; }
+  .stat { background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; min-width: 120px; }
+  .stat .n { font-size: 26px; font-weight: 800; }
+  .stat .l { font-size: 12px; color: var(--muted); }
+
+  .foot { margin-top: 26px; font-size: 12px; color: var(--muted); text-align: center; }
+  .muted { color: var(--muted); }
+  code { background: rgba(255,255,255,.06); padding: 1px 5px; border-radius: 5px; font-size: 12px; }
+
+  /* ---- referee ---- */
+  .rrounds { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .rround {
+    padding: 8px 12px; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--panel); cursor: pointer; font-weight: 700; font-size: 13px; color: var(--muted);
+  }
+  .rround.active { color: var(--text); border-color: var(--accent-2); background: #16233b; }
+  .rround .done { color: var(--accent); font-size: 11px; margin-left: 6px; }
+
+  .stations { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .station {
+    border: 1px solid var(--line); border-radius: 12px; padding: 12px; cursor: pointer;
+    background: rgba(255,255,255,.02); text-align: left;
+  }
+  .station:hover { border-color: var(--accent-2); }
+  .station .sn { font-size: 11px; color: var(--accent-2); font-weight: 700; letter-spacing: .05em; }
+  .station .sa, .station .sb { font-weight: 700; font-size: 15px; padding: 2px 0; }
+  .station .svs { font-size: 10px; color: var(--muted); letter-spacing: .1em; }
+  .station .status { margin-top: 8px; font-size: 11px; font-weight: 700; }
+  .station .status.open { color: var(--muted); }
+  .station .status.set { color: var(--accent); }
+
+  .bigmatch { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0 6px; }
+  .tapteam {
+    border: 2px solid var(--line); border-radius: 16px; padding: 28px 12px; text-align: center;
+    font-size: 20px; font-weight: 800; cursor: pointer; background: rgba(255,255,255,.03);
+    transition: transform .05s ease;
+  }
+  .tapteam:active { transform: scale(.98); }
+  .tapteam.picked { border-color: var(--accent); color: var(--accent); background: rgba(55,224,160,.10); }
+  .tapteam.win { border-color: var(--accent); background: rgba(55,224,160,.14); }
+
+  .confirmbar { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  .btn {
+    padding: 12px 18px; border-radius: 11px; border: 1px solid var(--line); cursor: pointer;
+    font-weight: 700; font-size: 14px; background: var(--panel); color: var(--text);
+  }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #04121a; border: 0; }
+  .btn.ghost { background: transparent; color: var(--muted); }
+
+  .locked {
+    border: 1px solid #1c4a3b; background: #0f1f1a; color: var(--ok);
+    border-radius: 12px; padding: 14px 16px; margin-top: 12px; font-weight: 700;
+  }
+  .locked small { display: block; color: var(--muted); font-weight: 500; margin-top: 4px; }
+
+  .audit { list-style: none; margin: 8px 0 0; padding: 0; }
+  .audit li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,.05); font-size: 13px; }
+  .audit li:first-child { border-top: 0; }
+  .audit .who { color: var(--muted); }
+
+  /* ---- live TV scoreboard (Step 3) ---- */
+  section.tv h2 { display: flex; align-items: center; gap: 8px; }
+  .livelabel { display: inline-flex; align-items: center; gap: 6px; color: var(--danger); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 8px var(--danger); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+  .stand { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .stand th, .stand td { text-align: left; padding: 10px 8px; border-top: 1px solid rgba(255,255,255,.06); }
+  .stand thead th { border-top: 0; font-size: 11px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+  .stand .num { text-align: center; }
+  .stand .rank { color: var(--muted); font-weight: 700; width: 30px; }
+  .stand tr.top td.team { color: var(--accent); font-weight: 800; }
+  .stand tr.top td.pts b { color: var(--accent); }
+  .stand .top8tag { font-size: 10px; color: var(--accent); border: 1px solid rgba(55,224,160,.4); background: rgba(55,224,160,.10); border-radius: 999px; padding: 1px 6px; margin-left: 8px; vertical-align: middle; }
+
+  .latest { margin: 0; padding: 0; }
+  .latest li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 0; border-top: 1px solid rgba(255,255,255,.06); font-size: 15px; }
+  .latest li:first-child { border-top: 0; }
+  .latest .win { color: var(--accent); font-weight: 800; }
+  .latest .lose { color: var(--muted); }
+  .latest .meta { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .latest .empty { color: var(--muted); font-size: 13.5px; }
+
+  /* ---- phase banner + champion ---- */
+  .phasebar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    border: 1px solid rgba(58,160,255,.4); background: rgba(58,160,255,.08);
+    border-radius: 12px; padding: 12px 14px; margin: 12px 0 2px; font-size: 14px; font-weight: 700;
+  }
+  .phasebar .pl { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-2); }
+  .phasebar.tie { border-color: rgba(255,196,84,.45); background: rgba(255,196,84,.07); }
+  .phasebar.tie .pl { color: #ffc454; }
+  .phasebar .teamname { color: var(--accent); }
+
+  .champ {
+    margin-top: 14px; text-align: center; padding: 22px 16px;
+    border: 2px solid rgba(55,224,160,.55); border-radius: 16px;
+    background: radial-gradient(400px 120px at 50% 0%, rgba(55,224,160,.18), rgba(55,224,160,.04));
+  }
+  .champ .cl { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); font-weight: 800; }
+  .champ .cn { font-size: 34px; font-weight: 900; color: var(--accent); margin-top: 4px; letter-spacing: .02em; }
+
+  /* ---- knockout bracket ---- */
+  .bracket { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 4px; }
+  .bcol { display: flex; flex-direction: column; justify-content: space-evenly; gap: 10px; }
+  .bcol .bcap { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 800; text-align: center; margin-bottom: 2px; }
+  .bmatch { border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.02); padding: 8px 10px; }
+  .bmatch .bt { font-size: 11.5px; font-weight: 700; padding: 3px 0; display: flex; justify-content: space-between; gap: 8px; }
+  .bmatch .bt .w { color: var(--accent); }
+  .bmatch .bt .tb { color: var(--muted); }
+  .bmatch .bsep { height: 1px; background: rgba(255,255,255,.06); margin: 3px 0; }
+  .bmatch.open { border-style: dashed; }
+  @media (max-width: 640px) { .bracket { grid-template-columns: 1fr; } }
+
+  /* ---- organizer console (PIN gate) ---- */
+  .pinrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  .pinrow .rlabel { min-width: 150px; }
+  .pinrow input, .pinrow select {
+    flex: 1; min-width: 160px; padding: 11px 12px; border-radius: 11px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 15px;
+  }
+  .pinrow input.err { border-color: var(--danger); }
+  .muted.small { font-size: 12.5px; margin-top: 8px; }
+  .muted.small.bad { color: var(--danger); }
+  .btn.danger { background: transparent; color: var(--danger); border: 1px solid rgba(255,93,108,.5); }
+  .orgmsg { margin-top: 10px; font-size: 13.5px; font-weight: 700; }
+  .orgmsg.ok { color: var(--ok); }
+  .orgmsg.bad { color: var(--danger); }
+
+  @media (max-width: 560px) {
+    .brand h1 { font-size: 16px; }
+    .stat { min-width: 100px; }
+    .bigmatch { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="mark">C</div>
+      <div>
+        <h1>Country Tournament</h1>
+        <p>Win/loser scoreboard · integrity model v1</p>
+      </div>
+    </div>
+    <div id="selftest" class="badge" aria-live="polite"><span class="dot"></span><span>Checking…</span></div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="board" role="tab">Scoreboard<span class="n" id="tabboard-n">live results</span></button>
+    <button class="tab" data-tab="referee" role="tab">Referee<span class="n">declare a winner</span></button>
+    <button class="tab" data-tab="organizer" role="tab">Organizer<span class="n">PIN-protected</span></button>
+  </nav>
+
+  <!-- ============ SCOREBOARD TAB (base + live) ============ -->
+  <div id="tab-board">
+    <section class="card">
+      <h2>Phase 1 — the base schedule</h2>
+      <div id="stats" class="stats"></div>
+      <div id="phasebanner" class="phasebar" hidden></div>
+    </section>
+
+    <section class="card tv">
+      <h2>Standings <span class="livelabel"><span class="pulse"></span>LIVE</span></h2>
+      <table class="stand">
+        <thead><tr><th class="rank">#</th><th>Team</th><th class="num">P</th><th class="num">W</th><th class="num">L</th><th class="num">Pts</th></tr></thead>
+        <tbody id="standbody"></tbody>
+      </table>
+    </section>
+
+    <section class="card" id="bracketcard" hidden>
+      <h2>Knockout — top 8 <span class="livelabel"><span class="pulse"></span>LIVE</span></h2>
+      <div id="tiebreakline" class="phasebar tie" hidden></div>
+      <div id="bracketgrid"></div>
+      <div id="champ" class="champ" hidden></div>
+    </section>
+
+    <section class="card tv">
+      <h2>Latest results <span class="livelabel"><span class="pulse"></span>LIVE</span></h2>
+      <ul id="latest" class="latest"></ul>
+    </section>
+
+    <section class="card">
+      <h2>Matchups, round by round</h2>
+      <div id="schedule" class="grid"></div>
+    </section>
+
+    <section class="card">
+      <h2>Every team's path</h2>
+      <div id="paths"></div>
+    </section>
+  </div>
+
+  <!-- ============ REFEREE TAB ============ -->
+  <div id="tab-referee" hidden>
+    <section class="card" id="pickercard">
+      <h2>Referee — declare your game</h2>
+      <p class="muted" style="margin-top:-6px;margin-bottom:14px;">
+        You're assigned to one station. Pick the round you're in, then the station you were posted to.
+      </p>
+      <div class="rrounds" id="rrounds"></div>
+      <div id="rstations" class="stations"></div>
+    </section>
+
+    <section class="card" id="declarecard" hidden>
+      <h2 id="declaretitle">Your match</h2>
+      <div id="declarebody"></div>
+    </section>
+
+    <section class="card" id="postcard" hidden>
+      <h2 id="posttitle">After Phase 1</h2>
+      <div id="postbody"></div>
+    </section>
+
+    <section class="card" id="auditcard" hidden>
+      <h2>Audit trail (who declared what, when)</h2>
+      <ul class="audit" id="auditlist"></ul>
+    </section>
+  </div>
+
+  <!-- ============ ORGANIZER TAB (PIN-protected console) ============ -->
+  <div id="tab-organizer" hidden>
+    <section class="card" id="orggate">
+      <h2>Organizer console</h2>
+      <p class="muted" style="margin-top:-6px;margin-bottom:14px;">
+        This gate protects the organizer actions (result corrections, start-fresh, PIN change).
+        It is a <b>local UI gate on a single file with no server</b> — it stops a teammate from
+        casually tampering, it is not credential-grade authentication. Every action taken here is
+        permanently recorded in the audit trail, with the actor label.
+      </p>
+      <div class="pinrow">
+        <label class="rlabel" for="orgpin">Organizer PIN</label>
+        <input id="orgpin" type="password" inputmode="numeric" autocomplete="off"
+               placeholder="default 1234" maxlength="8">
+        <button class="btn primary" id="orgunlock">Unlock</button>
+      </div>
+      <p class="muted small" id="orgerr" role="alert" hidden></p>
+      <div class="pinrow" style="margin-top:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <span class="muted small">Locked out? Reset the PIN back to 1234 (audited).</span>
+        <button class="btn ghost" id="orgresetpin">Reset PIN</button>
+      </div>
+    </section>
+
+    <div id="orgpanel" hidden>
+      <section class="card" id="orgboardcard">
+        <h2>Control board</h2>
+        <p class="muted" style="margin-top:-6px;margin-bottom:14px;">
+          The whole event at a glance — the stage, how much is decided, who's leading, and the
+          single next result to call. Read-only: nothing on this board changes the tournament.
+        </p>
+        <div class="stats" id="orgboard"></div>
+        <p class="muted small" id="orgnext" style="margin-top:14px;" role="status"></p>
+      </section>
+
+      <section class="card">
+        <h2>Correct a decided result</h2>
+        <p class="muted" style="margin-top:-6px;margin-bottom:14px;">
+          The only way a decided game ever changes. Pick the game, pick who should win — the
+          change re-flows the standings <b>and</b> the bracket, and is audited (previous winner
+          included).
+        </p>
+        <div class="pinrow">
+          <label class="rlabel" for="orgmatchsel">Decided match</label>
+          <select id="orgmatchsel"></select>
+        </div>
+        <div id="orgcorrectbody" style="margin-top:14px;"></div>
+      </section>
+
+      <section class="card">
+        <h2>Change the organizer PIN</h2>
+        <p class="muted" style="margin-top:-6px;margin-bottom:14px;">
+          Stored only as a hash (the clear PIN never touches localStorage). The PIN survives a
+          start-fresh; changing it is audited.
+        </p>
+        <div class="pinrow">
+          <label class="rlabel" for="orgpincur">Current PIN</label>
+          <input id="orgpincur" type="password" inputmode="numeric" autocomplete="off" maxlength="8">
+        </div>
+        <div class="pinrow">
+          <label class="rlabel" for="orgpinnew">New PIN (4–8 digits)</label>
+          <input id="orgpinnew" type="password" inputmode="numeric" autocomplete="off" maxlength="8">
+          <button class="btn primary" id="orgpinbtn">Change PIN</button>
+        </div>
+        <p class="muted small" id="orgpinmsg" role="alert" hidden></p>
+      </section>
+
+      <section class="card">
+        <h2>Archive &amp; start a fresh tournament</h2>
+        <p class="muted" style="margin-top:-6px;margin-bottom:14px;">
+          This does NOT wipe history: the whole tournament (schedule, results, full audit trail)
+          is archived first, then a clean Phase-1 state begins. The reset itself is the first
+          audited entry of the new tournament. Archives stack — history is never lost.
+        </p>
+        <button class="btn danger" id="orgreset">Archive &amp; start fresh</button>
+        <p class="muted small" id="orgarchives"></p>
+      </section>
+    </div>
+  </div>
+
+  <p class="foot" id="foot">
+    Complete: deterministic 16-team, 6-games-each Phase 1 with the live TV scoreboard (standings,
+    latest results, every team's path) · automatic top-8 qualification with the tie-for-8th
+    referee tiebreak · the 8→4→2→1 knockout with a live bracket and champion banner · and the
+    PIN-protected organizer console (audited corrections, archive-&amp;-start-fresh, PIN change).
+    Single file, no server — open it on the TV and on every referee's phone.
+  </p>
+</div>
+
+<script src="core.js"></script>
+<script>
+/* =========================================================================
+   SELF-TEST  —  validates the schedule AND the declare/lock contract.
+   Runs on a SCRATCH copy of state so it never mutates your real results.
+   ========================================================================= */
+function selfTest() {
+  const T = TOURNAMENT;
+  // 1) schedule invariants
+  const scratch = T.ensure();
+  T.validate(scratch.schedule, scratch.teams.length, scratch.stations);
+
+  // 2) determinism
+  const again = T.generateSchedule(scratch.teams.length, scratch.stations, T.mulberry32(scratch.seed));
+  if (JSON.stringify(again) !== JSON.stringify(scratch.schedule)) throw new Error('not deterministic');
+
+  // 3) declare / once-and-locked / audit  (on a private clone — no side effects)
+  const st = JSON.parse(JSON.stringify(scratch));
+  const p = st.schedule[0][0];                       // first station, round 1
+  const r1 = T.declare(st, 0, 0, p[0], 'selftest');
+  if (!r1.ok) throw new Error('declare should succeed: ' + r1.error);
+  const r2 = T.declare(st, 0, 0, p[1], 'selftest');  // same game, other team
+  if (r2.ok) throw new Error('second declare must be refused (once-and-locked)');
+  if (r2.winner !== p[0]) throw new Error('locked winner mismatch');
+  if (T.declare(st, 0, 0, p[1], 'selftest').error !== 'already decided') throw new Error('lock error code wrong');
+  if (st.audit.length !== 1) throw new Error('audit should have exactly 1 entry');
+
+  // 4) organizer correction: the only way to change a decided game
+  const key = T.gameKey(p[0], p[1]);
+  const c1 = T.correctResult(st, key, p[0], p[1], p[1], 'selftest-organizer');
+  if (!c1.ok) throw new Error('correction should succeed: ' + c1.error);
+  if (c1.prev !== p[0]) throw new Error('correction prev wrong');
+  if (st.results[key] !== p[1]) throw new Error('correction did not change winner');
+  if (T.correctResult(st, key, p[0], p[1], 999, 'x').error !== 'winner is not a team in this match') throw new Error('foreign-team correction must be refused');
+  const oq = st.schedule[0][1];                                    // an open (undecided) game
+  if (T.correctResult(st, T.gameKey(oq[0], oq[1]), oq[0], oq[1], oq[0], 'x').error !== 'game not decided') throw new Error('correcting an open game must be refused');
+  const last = st.audit[st.audit.length - 1];
+  if (last.note !== 'correction (organizer override)') throw new Error('correction not audited');
+  if (last.prev !== p[0]) throw new Error('correction audit missing prev');
+
+  // 5) start-fresh: archive the tournament, then a clean Phase-1 state
+  const before = Object.keys(st.results).length;
+  if (before < 1) throw new Error('expected a decided game before reset');
+  const fresh = T.resetTournament(st, 'selftest-organizer');
+  if (Object.keys(fresh.results).length !== 0) throw new Error('reset should clear results');
+  if (fresh.phase !== 'phase1') throw new Error('reset should be phase1');
+  if (!fresh.archives || fresh.archives.length !== 1) throw new Error('reset should archive the prior tournament');
+  if (Object.keys(fresh.archives[0].results).length !== before) throw new Error('archived results lost');
+  if (fresh.archives[0].audit.length !== st.audit.length) throw new Error('archived audit trail lost');
+  if (fresh.audit.length !== 1 || fresh.audit[0].note.indexOf('reset') !== 0) throw new Error('reset should be audited');
+
+  // 6a) organizer PIN gate: default passes, wrong pin fails, change is audited
+  const stp = JSON.parse(JSON.stringify(fresh));
+  if (T.checkPin(stp, T.DEFAULT_PIN) !== true) throw new Error('default PIN should pass');
+  if (T.checkPin(stp, '000000') !== false) throw new Error('wrong PIN must fail');
+  if (!T.setPin(stp, '987654', 'selftest-organizer').ok) throw new Error('setPin should succeed');
+  if (T.checkPin(stp, '987654') !== true) throw new Error('new PIN should pass after change');
+  if (T.checkPin(stp, T.DEFAULT_PIN) !== false) throw new Error('old PIN must stop working');
+  if (stp.audit[stp.audit.length - 1].note !== 'PIN changed') throw new Error('PIN change must be audited');
+  if (T.setPin(stp, '12', 'x').ok) throw new Error('too-short PIN must be refused');
+  if (T.setPin(stp, 'abcd', 'x').ok) throw new Error('non-numeric PIN must be refused');
+
+  // 6b) reset-to-default escape hatch: restores 1234 after a change, audited
+  if (T.checkPin(stp, T.DEFAULT_PIN) !== false) throw new Error('default should still fail before reset');
+  if (!T.resetPin(stp, 'selftest-organizer').ok) throw new Error('resetPin should succeed');
+  if (T.checkPin(stp, T.DEFAULT_PIN) !== true) throw new Error('default PIN should pass after reset');
+  if (T.checkPin(stp, '987654') !== false) throw new Error('changed PIN must stop working after reset');
+  if (stp.audit[stp.audit.length - 1].note !== 'PIN reset to default') throw new Error('PIN reset must be audited');
+
+  /* ---- Step 4: qualification, tiebreak, knockout (all on scratch clones) ---- */
+
+  // helper: finish ALL 48 base games on a clone (winner = first team listed)
+  function finishPhase1(s) {
+    s.schedule.forEach(round => round.forEach(([a, b]) => {
+      s.results[T.gameKey(a, b)] = a;
+    }));
+  }
+
+  // 6) qualification when NO tie for 8th: everyone above/below splits cleanly
+  const s6 = JSON.parse(JSON.stringify(fresh));
+  finishPhase1(s6);
+  const std6 = T.standings(s6);
+  const line6 = std6[7].pts;
+  const on6 = std6.filter(r => r.pts === line6).length;
+  const q6 = T.qualification(s6);
+  if (on6 <= 8 - std6.filter(r => r.pts > line6).length) {
+    // no tiebreak needed
+    if (q6.tiebreak) throw new Error('qual: should not need a tiebreak');
+    if (q6.advanced.length !== 8) throw new Error('qual: advanced should be exactly 8');
+    if (q6.advanced.slice().sort((a, b) => a - b).join() !==
+        std6.slice(0, 8).map(r => r.idx).slice().sort((a, b) => a - b).join())
+      throw new Error('qual: advanced set should be the top-8 ranked');
+  } else {
+    // tie for 8th: the two highest-seeded on-line teams play
+    if (!q6.tiebreak || q6.tiebreak.length !== 2) throw new Error('qual: expected a 2-team tiebreak');
+    const [ta, tb] = q6.tiebreak;
+    const onLine = std6.filter(r => r.pts === line6);
+    if (q6.tiebreak[0] !== onLine[0].idx || q6.tiebreak[1] !== onLine[1].idx)
+      throw new Error('qual: tiebreak must be the two highest-seeded on-line teams');
+    if (q6.advanced.length !== 7) throw new Error('qual: 7 auto-advance + 1 tiebreak slot');
+    if (q6.advanced.indexOf(ta) !== -1 || q6.advanced.indexOf(tb) !== -1)
+      throw new Error('qual: tiebreak teams must not auto-advance');
+    // 7a) tiebreak pending: no bracket yet
+    if (T.currentPhase(s6).phase !== 'tiebreak') throw new Error('phase should be tiebreak');
+    if (T.bracket(s6)) throw new Error('bracket must be null while tiebreak is pending');
+    // 7b) declare the tiebreak -> bracket appears with QF seeds 1v8..4v5
+    const tr = T.declareMatch(s6, T.tiebreakKey(ta, tb), ta, tb, tb, 'selftest-ref');
+    if (!tr.ok) throw new Error('tiebreak declare should succeed: ' + tr.error);
+    if (T.declareMatch(s6, T.tiebreakKey(ta, tb), ta, tb, ta, 'x').error !== 'already decided')
+      throw new Error('tiebreak must be once-and-locked');
+    const bk6 = T.bracket(s6);
+    const A = bk6.rounds[0];
+    if (A.length !== 4) throw new Error('QF must have 4 matches');
+    const adv = T.advancement(s6).advanced;
+    if (!(A[0].a === adv[0] && A[0].b === adv[7] && A[1].a === adv[1] && A[1].b === adv[6]
+        && A[2].a === adv[2] && A[2].b === adv[5] && A[3].a === adv[3] && A[3].b === adv[4]))
+      throw new Error('QF seedings must be 1v8 2v7 3v6 4v5');
+    if (bk6.rounds[1].length !== 2 && bk6.rounds[2].length !== 1) throw new Error('bracket shape wrong');
+    if (bk6.rounds[1][0].a !== null) throw new Error('SF must be TBC before QF decides');
+    // 8) walk the bracket to a champion — feed rule 2m / 2m+1
+    const wQF = [A[0].a, A[1].a, A[2].b, A[3].b];   // arbitrary but valid winners
+    A.forEach((m, i) => {
+      const r = T.declareMatch(s6, m.key, m.a, m.b, wQF[i], 'selftest-ref');
+      if (!r.ok) throw new Error('QF declare should succeed: ' + r.error);
+    });
+    const SF = T.bracket(s6).rounds[1];
+    if (!(SF[0].a === wQF[0] && SF[0].b === wQF[1] && SF[1].a === wQF[2] && SF[1].b === wQF[3]))
+      throw new Error('SF must take winners of (QF1,QF2) and (QF3,QF4)');
+    const wSF = [SF[0].b, SF[1].a];
+    SF.forEach((m, i) => {
+      const r = T.declareMatch(s6, m.key, m.a, m.b, wSF[i], 'selftest-ref');
+      if (!r.ok) throw new Error('SF declare should succeed: ' + r.error);
+    });
+    const FIN = T.bracket(s6).rounds[2][0];
+    if (!(FIN.a === wSF[0] && FIN.b === wSF[1])) throw new Error('final must take SF winners');
+    const fr = T.declareMatch(s6, FIN.key, FIN.a, FIN.b, FIN.b, 'selftest-ref');
+    if (!fr.ok) throw new Error('final declare should succeed: ' + fr.error);
+    const ph = T.currentPhase(s6);
+    if (ph.phase !== 'done' || ph.champion !== FIN.b) throw new Error('champion not recorded');
+    // 9) correction re-flow: flip the final -> champion changes, all audited
+    const flip = T.correctResult(s6, FIN.key, FIN.a, FIN.b, FIN.a, 'selftest-organizer');
+    if (!flip.ok) throw new Error('final correction should succeed');
+    if (T.currentPhase(s6).champion !== FIN.a) throw new Error('correction must re-flow the champion');
+    const la = s6.audit[s6.audit.length - 1];
+    if (la.prev !== FIN.b || la.winner !== FIN.a) throw new Error('final correction must audit prev + new');
+    // 10) referee guard: cannot declare a match whose teams are TBC
+    if (T.declareMatch(s6, 'ko-r9m9', null, null, 0, 'x').error.indexOf('not set') === -1)
+      throw new Error('TBC match declare must be refused');
+  }
+
+  return { ok: true, games: st.schedule.reduce((s, r) => s + r.length, 0) };
+}
+
+/* =========================================================================
+   VIEW  —  tab switching, scoreboard render, referee render
+   ========================================================================= */
+
+const App = (() => {
+  const T = TOURNAMENT;
+  let activeTab = 'board';
+  let rRound = 0;          // currently selected round in referee picker (0-based)
+  let rStation = null;     // currently open station (0-based) in referee view
+  let picked = null;       // team index pending confirm
+  let postPick = null;     // { key, a, b, winner } pending confirm (tiebreak / knockout)
+  let orgUnlocked = false; // per-session gate for the organizer console
+
+  // ---------- tabs ----------
+  function setTab(name) {
+    activeTab = name;
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    document.getElementById('tab-board').hidden = (name !== 'board');
+    document.getElementById('tab-referee').hidden = (name !== 'referee');
+    document.getElementById('tab-organizer').hidden = (name !== 'organizer');
+    render();
+  }
+
+  // ---------- scoreboard ----------
+  function renderBoard() {
+    const state = T.ensure();
+    const N = state.teams.length;
+    const games = state.schedule.reduce((s, r) => s + r.length, 0);
+    const done = T.declaredCount(state);
+
+    document.getElementById('tabboard-n').textContent = done + ' / ' + games + ' decided';
+
+    // Live standings — top 8 highlighted (they advance to the bracket).
+    const tname = state.teams;
+    const stand = T.standings(state);
+    document.getElementById('standbody').innerHTML = stand.map((row, i) => {
+      const top = i < 8;
+      return `<tr class="${top ? 'top' : ''}">
+        <td class="rank">${i + 1}</td>
+        <td>${tname[row.idx]}${top ? ' <span class="top8tag">top 8</span>' : ''}</td>
+        <td class="num">${row.played}</td>
+        <td class="num">${row.wins}</td>
+        <td class="num">${row.losses}</td>
+        <td class="num"><b>${row.pts}</b></td>
+      </tr>`;
+    }).join('');
+
+    // Latest results — newest first.
+    const latest = T.latestResults(state).slice().reverse();
+    document.getElementById('latest').innerHTML = latest.length ? latest.map(({ a, b, winner }) => {
+      const loser = winner === a ? b : a;
+      return `<li>
+        <span class="win">${tname[winner]}</span>
+        <span class="lose">def. ${tname[loser]}</span>
+        <span class="meta">W 1 · L 0</span>
+      </li>`;
+    }).join('') : '<li class="empty">No results yet — as soon as a referee declares a winner, it appears here live.</li>';
+
+    document.getElementById('stats').innerHTML = [
+      ['Teams', N],
+      ['Rounds', state.schedule.length],
+      ['Total games', games],
+      ['Decided', done],
+      ['In parallel', state.stations]
+    ].map(([l, n]) => `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+
+    const Tms = state.teams;
+    document.getElementById('schedule').innerHTML = state.schedule.map((round, ri) => {
+      const rows = round.map(([a, b]) => {
+        const w = T.resultFor(state, a, b);
+        const clsA = w === a ? 'win' : '';
+        const clsB = w === b ? 'win' : '';
+        return `<div class="match">
+          <span class="team ${clsA}" style="${w === a ? 'color:var(--accent);font-weight:800;' : ''}">${Tms[a]}</span>
+          <span class="vs">${w != null ? 'W/L' : 'VS'}</span>
+          <span class="team ${clsB}" style="${w === b ? 'color:var(--accent);font-weight:800;' : ''}">${Tms[b]}</span>
+        </div>`;
+      }).join('');
+      return `<div class="round"><div class="rlabel">Round ${ri + 1}</div>${rows}</div>`;
+    }).join('');
+
+    document.getElementById('paths').innerHTML = state.teams.map((name, i) => {
+      const opp = [];
+      state.schedule.forEach((round, ri) => {
+        round.forEach(([a, b]) => {
+          if (a === i) opp.push([ri + 1, Tms[b]]);
+          if (b === i) opp.push([ri + 1, Tms[a]]);
+        });
+      });
+      opp.sort((x, y) => x[0] - y[0]);
+      return `<div class="team-row"><span class="name">${name}</span>
+        ${opp.map(([r, o]) => `<span class="chip"><b>R${r}</b> ${o}</span>`).join('')}</div>`;
+    }).join('');
+
+    // ---- phase banner + knockout bracket (live-derived; single source: currentPhase) ----
+    const ph = T.currentPhase(state);
+    const banner = document.getElementById('phasebanner');
+    banner.hidden = false;
+    if (ph.phase === 'phase1') {
+      banner.innerHTML = `<span class="pl">Phase 1</span> ${ph.p1.done} / ${ph.p1.total} games decided — top 8 advance to the knockout`;
+    } else if (ph.phase === 'tiebreak') {
+      banner.innerHTML = `<span class="pl">Phase 1 complete</span> tie-for-8th: ${Tms[ph.tiebreak[0]]} vs ${Tms[ph.tiebreak[1]]} — referee tiebreak pending`;
+    } else if (ph.phase === 'done') {
+      banner.innerHTML = `<span class="pl">Tournament complete</span> champion: <b>${Tms[ph.champion]}</b>`;
+    } else {
+      banner.innerHTML = `<span class="pl">Phase 1 complete</span> top 8 advanced — knockout in progress`;
+    }
+
+    const cardB = document.getElementById('bracketcard');
+    const tl = document.getElementById('tiebreakline');
+    const gridEl = document.getElementById('bracketgrid');
+    const champEl = document.getElementById('champ');
+    if (ph.phase === 'phase1') { cardB.hidden = true; return; }
+    cardB.hidden = false;
+
+    if (ph.phase === 'tiebreak') {
+      tl.hidden = false;
+      tl.innerHTML = `<span class="pl">Tie-for-8th</span> ${Tms[ph.tiebreak[0]]} vs ${Tms[ph.tiebreak[1]]} — declare it in the Referee tab`;
+      gridEl.innerHTML = '<p class="muted">The bracket locks in the moment the tiebreak is declared.</p>';
+      champEl.hidden = true;
+      return;
+    }
+    tl.hidden = true;
+    const bk = ph.bracket;
+    const CAPS = ['Quarter-finals', 'Semi-finals', 'Final'];
+    gridEl.innerHTML = '<div class="bracket">' + bk.rounds.map((ms, ri) => {
+      const col = ms.map(mt => {
+        const w = state.results[mt.key];
+        const cell = (x, isW) => x == null
+          ? '<div class="bt tb">TBD</div>'
+          : `<div class="bt ${isW ? 'w' : ''}">${isW ? '<b>' + Tms[x] + '</b>' : Tms[x]}</div>`;
+        return `<div class="bmatch ${w === undefined ? 'open' : ''}">${cell(mt.a, w === mt.a)}<div class="bsep"></div>${cell(mt.b, w === mt.b)}</div>`;
+      }).join('');
+      return `<div class="bcol"><div class="bcap">${CAPS[ri]}</div>${col}</div>`;
+    }).join('') + '</div>';
+    if (ph.phase === 'done') {
+      champEl.hidden = false;
+      champEl.innerHTML = `<div class="cl">Champion</div><div class="cn">${Tms[ph.champion]}</div>`;
+    } else {
+      champEl.hidden = true;
+    }
+  }
+
+  // ---------- referee ----------
+  function renderReferee() {
+    const state = T.ensure();
+    const Tms = state.teams;
+    const ph = T.currentPhase(state);
+
+    // Phase 1 over: the station picker retires — the referee's job becomes the
+    // tie-for-8th and the knockout, handled in the post-phase-1 card.
+    if (ph.phase !== 'phase1') {
+      document.getElementById('pickercard').hidden = true;
+      document.getElementById('declarecard').hidden = true;
+      document.getElementById('postcard').hidden = false;
+      renderPost(state, Tms, ph);
+      renderAudit();
+      return;
+    }
+    document.getElementById('pickercard').hidden = false;
+    document.getElementById('postcard').hidden = true;
+
+    // round picker
+    document.getElementById('rrounds').innerHTML = state.schedule.map((round, ri) => {
+      const dec = round.filter(([a, b]) => T.resultFor(state, a, b) != null).length;
+      return `<button class="rround ${ri === rRound ? 'active' : ''}" data-r="${ri}">
+        Round ${ri + 1}${dec ? `<span class="done">${dec}/${round.length}</span>` : ''}
+      </button>`;
+    }).join('');
+    document.querySelectorAll('#rrounds .rround').forEach(b =>
+      b.onclick = () => { rRound = +b.dataset.r; rStation = null; picked = null; render(); });
+
+    // stations in the selected round
+    document.getElementById('rstations').innerHTML = state.schedule[rRound].map((pair, si) => {
+      const [a, b] = pair;
+      const w = T.resultFor(state, a, b);
+      return `<button class="station ${rStation === si ? 'active' : ''}" data-s="${si}">
+        <div class="sn">STATION ${si + 1}</div>
+        <div class="sa">${Tms[a]}</div><div class="svs">vs</div><div class="sb">${Tms[b]}</div>
+        <div class="status ${w != null ? 'set' : 'open'}">${w != null ? '✓ ' + Tms[w] + ' won' : 'tap to declare'}</div>
+      </button>`;
+    }).join('');
+    document.querySelectorAll('#rstations .station').forEach(b =>
+      b.onclick = () => { rStation = +b.dataset.s; picked = null; render(); });
+
+    // declare panel for the chosen station
+    const card = document.getElementById('declarecard');
+    if (rStation == null) { card.hidden = true; renderAudit(); return; }
+    card.hidden = false;
+    const pair = T.stationOf(state, rRound, rStation);
+    const [a, b] = pair;
+    const w = T.resultFor(state, a, b);
+    document.getElementById('declaretitle').textContent =
+      `Round ${rRound + 1} · Station ${rStation + 1} — your match`;
+
+    if (w != null) {
+      // LOCKED — read-only. No re-declare possible from this screen.
+      document.getElementById('declarebody').innerHTML =
+        `<div class="bigmatch">
+           <div class="tapteam ${w === a ? 'win' : ''}">${Tms[a]}</div>
+           <div class="tapteam ${w === b ? 'win' : ''}">${Tms[b]}</div>
+         </div>
+         <div class="locked">✓ Locked — ${Tms[w]} won.
+           <small>This game is final. Changing a decided result is an organizer action and is logged (Step 5).</small>
+         </div>`;
+      renderAudit();
+      return;
+    }
+
+    // OPEN — two-button declare with two-tap confirm.
+    const body = document.getElementById('declarebody');
+    body.innerHTML =
+      `<div class="bigmatch">
+         <div class="tapteam ${picked === a ? 'picked' : ''}" data-t="${a}">${Tms[a]}</div>
+         <div class="tapteam ${picked === b ? 'picked' : ''}" data-t="${b}">${Tms[b]}</div>
+       </div>
+       <div class="confirmbar">
+         <span class="muted" id="confmsg">Tap a team to select the winner.</span>
+       </div>`;
+    body.querySelectorAll('.tapteam').forEach(el => {
+      el.onclick = () => {
+        const t = +el.dataset.t;
+        if (picked === t) { picked = null; }   // tap the same team again -> deselect
+        else { picked = t; }
+        render();
+      };
+    });
+    const msg = document.getElementById('confmsg');
+    if (picked != null) {
+      msg.innerHTML = `<span>${Tms[picked]} selected. </span>
+        <button class="btn primary" id="confirmbtn">Confirm ${Tms[picked]} wins</button>
+        <button class="btn ghost" id="cancelbtn">Cancel</button>`;
+      document.getElementById('confirmbtn').onclick = () => confirmDeclare(a, b);
+      document.getElementById('cancelbtn').onclick = () => { picked = null; render(); };
+    } else {
+      msg.textContent = 'Tap a team to select the winner.';
+    }
+    renderAudit();
+  }
+
+  // ---------- referee: post-phase-1 (tie-for-8th + knockout) ----------
+  function renderPost(state, Tms, ph) {
+    const title = document.getElementById('posttitle');
+    const body = document.getElementById('postbody');
+    let html = '';
+
+    if (ph.phase === 'tiebreak') {
+      const [a, b] = ph.tiebreak;
+      title.textContent = 'Tie-for-8th — referee tiebreak';
+      html = `<p class="muted">Two teams sit on the qualification line. You are the tiebreak referee — tap the winner; it locks immediately and the bracket appears on the board.</p>
+        <div class="bigmatch">
+          <div class="tapteam ${postPick && postPick.key === ph.key && postPick.winner === a ? 'picked' : ''}" data-k="${ph.key}" data-a="${a}" data-b="${b}" data-t="${a}">${Tms[a]}</div>
+          <div class="tapteam ${postPick && postPick.key === ph.key && postPick.winner === b ? 'picked' : ''}" data-k="${ph.key}" data-a="${a}" data-b="${b}" data-t="${b}">${Tms[b]}</div>
+        </div>`;
+    } else if (ph.phase === 'done') {
+      title.textContent = 'Tournament complete';
+      html = `<div class="champ"><div class="cl">Champion</div><div class="cn">${Tms[ph.champion]}</div></div>
+        <p class="muted" style="margin-top:14px;">Every match is declared and locked. Changing a decided result is an organizer action (PIN-protected, audited).</p>`;
+      body.innerHTML = html;
+      return;
+    } else {
+      title.textContent = 'Knockout — declare the next match';
+      const bk = ph.bracket;
+      const CAPS = ['Quarter-finals', 'Semi-finals', 'Final'];
+      html = '<p class="muted">Decide matches round by round — each one locks the moment you confirm and feeds the next round.</p><div class="bracket">';
+      bk.rounds.forEach((ms, ri) => {
+        html += `<div class="bcol"><div class="bcap">${CAPS[ri]}</div>`;
+        ms.forEach(mt => {
+          const w = state.results[mt.key];
+          if (mt.a == null || mt.b == null) {
+            html += `<div class="bmatch open"><div class="bt tb">TBD</div><div class="bsep"></div><div class="bt tb">TBD</div></div>`;
+          } else if (w != null) {
+            html += `<div class="bmatch">
+              <div class="bt ${w === mt.a ? 'w' : ''}">${Tms[mt.a]}</div>
+              <div class="bsep"></div>
+              <div class="bt ${w === mt.b ? 'w' : ''}">${Tms[mt.b]}</div></div>`;
+          } else {
+            html += `<div class="bmatch open">
+              <div class="bt tapteam ${postPick && postPick.key === mt.key && postPick.winner === mt.a ? 'picked' : ''}" data-k="${mt.key}" data-a="${mt.a}" data-b="${mt.b}" data-t="${mt.a}">${Tms[mt.a]}</div>
+              <div class="bsep"></div>
+              <div class="bt tapteam ${postPick && postPick.key === mt.key && postPick.winner === mt.b ? 'picked' : ''}" data-k="${mt.key}" data-a="${mt.a}" data-b="${mt.b}" data-t="${mt.b}">${Tms[mt.b]}</div>
+            </div>`;
+          }
+        });
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    html += '<div class="confirmbar"><span class="muted" id="postconfmsg">Tap a team on an open match to select the winner.</span></div>';
+    body.innerHTML = html;
+
+    body.querySelectorAll('.tapteam').forEach(el => {
+      el.onclick = () => {
+        const t = +el.dataset.t;
+        if (postPick && postPick.key === el.dataset.k && postPick.winner === t) postPick = null;
+        else postPick = { key: el.dataset.k, a: +el.dataset.a, b: +el.dataset.b, winner: t };
+        render();
+      };
+    });
+    const msg = document.getElementById('postconfmsg');
+    if (postPick) {
+      msg.innerHTML = `<span>${Tms[postPick.winner]} selected. </span>
+        <button class="btn primary" id="postok">Confirm ${Tms[postPick.winner]} wins</button>
+        <button class="btn ghost" id="postcancel">Cancel</button>`;
+      document.getElementById('postok').onclick = () => {
+        const st = T.ensure();
+        const label = postPick.key.indexOf('tb-') === 0 ? 'tiebreak' : 'knockout';
+        const res = T.declareMatch(st, postPick.key, postPick.a, postPick.b, postPick.winner, 'referee', label);
+        if (!res.ok) { alert('Could not record: ' + res.error); return; }
+        T.save(st);
+        postPick = null;
+        render();
+      };
+      document.getElementById('postcancel').onclick = () => { postPick = null; render(); };
+    } else {
+      msg.textContent = 'Tap a team on an open match to select the winner.';
+    }
+  }
+
+  function confirmDeclare(a, b) {
+    if (picked == null) return;
+    const winner = picked;
+    const actor = 'station R' + (rRound + 1) + 'S' + (rStation + 1);
+    const state = T.ensure();
+    const res = T.declare(state, rRound, rStation, winner, actor);
+    if (!res.ok) { alert('Could not record: ' + res.error); return; }
+    T.save(state);   // App layer persists (core is pure / side-effect free)
+    picked = null;
+    render();
+  }
+
+  function renderAudit() {
+    const state = T.ensure();
+    const Tms = state.teams;
+    const card = document.getElementById('auditcard');
+    if (state.audit.length === 0) { card.hidden = true; return; }
+    card.hidden = false;
+    const rows = state.audit.slice().reverse().map(e => {
+      // Entries differ by source: phase-1 declares carry round+station,
+      // tiebreak/knockout declares carry only the match, corrections carry
+      // `prev`, and system entries (reset, PIN change) carry no match at all.
+      let what;
+      if (e.game) {
+        const [a, b] = e.game;
+        const head = (e.round != null ? 'R' + e.round + ' · ' : '') + Tms[a] + ' vs ' + Tms[b];
+        what = head + ' → <b>' + Tms[e.winner] + '</b>' + (e.prev != null ? ' (was ' + Tms[e.prev] + ')' : '');
+      } else {
+        what = e.note || 'system entry';
+      }
+      return `<li>
+        <span>${what}</span>
+        <span class="who">${e.actor}</span>
+      </li>`;
+    }).join('');
+    document.getElementById('auditlist').innerHTML = rows;
+  }
+
+  function render() {
+    renderBoard();
+    if (activeTab === 'referee') renderReferee();
+    if (activeTab === 'organizer') renderOrganizer();
+  }
+
+  // ---------- organizer (PIN-gated; every action audited) ----------
+  function decidedMatches(state) {
+    const Tms = state.teams;
+    const out = [];
+    state.schedule.forEach((round, ri) => round.forEach(([a, b]) => {
+      const key = T.gameKey(a, b);
+      if (state.results[key] !== undefined)
+        out.push({ key, a, b, label: 'Phase 1 · R' + (ri + 1) + ' · ' + Tms[a] + ' vs ' + Tms[b] });
+    }));
+    const q = T.qualification(state);
+    if (q.tiebreak) {
+      const key = T.tiebreakKey(q.tiebreak[0], q.tiebreak[1]);
+      if (state.results[key] !== undefined)
+        out.push({ key, a: q.tiebreak[0], b: q.tiebreak[1], label: 'Tie-for-8th · ' + Tms[q.tiebreak[0]] + ' vs ' + Tms[q.tiebreak[1]] });
+    }
+    const bk = T.bracket(state);
+    if (bk) {
+      const CAP = { 1: 'Quarter-final', 2: 'Semi-final', 3: 'Final' };
+      bk.rounds.forEach(rnd => rnd.forEach(mt => {
+        if (mt.a != null && mt.b != null && state.results[mt.key] !== undefined)
+          out.push({ key: mt.key, a: mt.a, b: mt.b, label: CAP[mt.r] + ' ' + mt.m + ' · ' + Tms[mt.a] + ' vs ' + Tms[mt.b] });
+      }));
+    }
+    return out;
+  }
+
+  // The single next result the organizer should call, in event order. Pure — reads state only.
+  function nextCall(state) {
+    const Tms = state.teams;
+    const ph = T.currentPhase(state);
+    if (ph.phase === 'done') return null;
+    if (ph.phase === 'tiebreak') {
+      const a = ph.tiebreak[0], b = ph.tiebreak[1];
+      return 'Tie-for-8th · ' + Tms[a] + ' vs ' + Tms[b];
+    }
+    if (ph.phase === 'phase2') {
+      const CAP = { 1: 'Quarter-final', 2: 'Semi-final', 3: 'Final' };
+      for (const rnd of ph.bracket.rounds)
+        for (const mt of rnd)
+          if (mt.a != null && mt.b != null && state.results[mt.key] === undefined)
+            return CAP[mt.r] + ' · ' + Tms[mt.a] + ' vs ' + Tms[mt.b];
+      return 'Waiting on an earlier round';
+    }
+    // phase1: the next undecided base game, in schedule order
+    for (let ri = 0; ri < state.schedule.length; ri++)
+      for (let si = 0; si < state.schedule[ri].length; si++) {
+        const [a, b] = state.schedule[ri][si];
+        if (state.results[T.gameKey(a, b)] === undefined)
+          return 'Phase 1 · R' + (ri + 1) + ' · ' + Tms[a] + ' vs ' + Tms[b];
+      }
+    return 'All Phase-1 games declared';
+  }
+
+  // Populate the read-only control board from the (pure) core. Never mutates or saves.
+  function renderControlBoard(state) {
+    const Tms = state.teams;
+    const ph = T.currentPhase(state);
+    const rows = T.standings(state);
+    const p1 = T.phase1Decided(state);
+    const PHASE = { phase1: 'Phase 1 · league', tiebreak: 'Tie-for-8th', phase2: 'Knockout', done: 'Complete' };
+    let fourth;
+    if (ph.phase === 'done')
+      fourth = `<div class="stat"><div class="n">${Tms[ph.champion]}</div><div class="l">champion</div></div>`;
+    else if (ph.phase === 'phase2')
+      fourth = `<div class="stat"><div class="n">TBC</div><div class="l">champion</div></div>`;
+    else
+      fourth = `<div class="stat"><div class="n">${Tms[rows[7].idx]}</div><div class="l">${rows[7].pts} pts · 8th (cut line)</div></div>`;
+    document.getElementById('orgboard').innerHTML =
+      `<div class="stat"><div class="n">${PHASE[ph.phase]}</div><div class="l">stage</div></div>` +
+      `<div class="stat"><div class="n">${p1.done} / ${p1.total}</div><div class="l">Phase-1 games decided</div></div>` +
+      `<div class="stat"><div class="n">${Tms[rows[0].idx]}</div><div class="l">${rows[0].pts} pts · leader</div></div>` +
+      fourth;
+    document.getElementById('orgnext').innerHTML =
+      ph.phase === 'done'
+        ? '🏆 Tournament complete — the champion is <b>' + Tms[ph.champion] + '</b>.'
+        : 'Next to call: <b>' + nextCall(state) + '</b>';
+  }
+
+  function renderOrganizer() {
+    const state = T.ensure();
+    const Tms = state.teams;
+    const gate = document.getElementById('orggate');
+    const panel = document.getElementById('orgpanel');
+    if (!orgUnlocked) { gate.hidden = false; panel.hidden = true; return; }
+    gate.hidden = true; panel.hidden = false;
+
+    // (0) Live control board — read-only overview of the whole event
+    renderControlBoard(state);
+
+    // (1) Correct a decided result — only ever applied to an existing result
+    const matches = decidedMatches(state);
+    const sel = document.getElementById('orgmatchsel');
+    sel.innerHTML = matches.length
+      ? matches.map((m, i) => `<option value="${i}">${m.label}</option>`).join('')
+      : '<option value="">No decided matches yet</option>';
+    const body = document.getElementById('orgcorrectbody');
+    if (!matches.length) {
+      body.innerHTML = '<p class="muted small">Declare a game first — corrections only apply to decided results.</p>';
+    } else {
+      const m = matches[+sel.value || 0];
+      const w = state.results[m.key];
+      const btn = (t) => t === w
+        ? `<button class="btn ghost" disabled>${Tms[t]} (current)</button>`
+        : `<button class="btn primary" data-w="${t}">Make ${Tms[t]} win</button>`;
+      body.innerHTML = `<p class="muted small" style="margin-bottom:10px;">Currently: <b>${Tms[w]}</b> won. Any change is audited with the previous winner.</p>
+        <div class="pinrow" style="margin-bottom:10px;">${btn(m.a)}${btn(m.b)}</div>
+        <p class="muted small orgmsg" id="orgcorrmsg" role="alert" hidden></p>`;
+      body.querySelectorAll('[data-w]').forEach(b => b.onclick = () => {
+        const st = T.ensure();
+        const res = T.correctResult(st, m.key, m.a, m.b, +b.dataset.w, 'organizer');
+        if (!res.ok) { const el = document.getElementById('orgcorrmsg'); if (el) { el.hidden = false; el.textContent = res.error; } return; }
+        T.save(st);
+        render();
+      });
+    }
+    sel.onchange = () => renderOrganizer();
+
+    // (3) Archive history — nothing is ever deleted, only archived
+    const arch = state.archives || [];
+    document.getElementById('orgarchives').innerHTML = arch.length
+      ? arch.map(x => `<b>#${x.id}</b> · ${x.phase} · ${Object.keys(x.results).length} games decided`).join(' &nbsp;·&nbsp; ')
+      : 'No tournaments archived yet — the last one you archive will appear here.';
+  }
+
+  function wireOrg() {
+    const unlock = () => {
+      const st = T.ensure();
+      const pinEl = document.getElementById('orgpin');
+      const err = document.getElementById('orgerr');
+      if (T.checkPin(st, pinEl.value)) {
+        orgUnlocked = true;
+        pinEl.value = '';
+        err.hidden = true;
+        renderOrganizer();
+      } else {
+        err.hidden = false;
+        err.textContent = 'Wrong PIN. (Default is 1234 until the organizer changes it.)';
+      }
+    };
+    document.getElementById('orgunlock').onclick = unlock;
+    document.getElementById('orgpin').onkeydown = e => { if (e.key === 'Enter') unlock(); };
+
+    // (2) Change the PIN — audited, hash-only storage
+    document.getElementById('orgpinbtn').onclick = () => {
+      const st = T.ensure();
+      const cur = document.getElementById('orgpincur').value;
+      const next = document.getElementById('orgpinnew').value;
+      const msg = document.getElementById('orgpinmsg');
+      msg.hidden = false;
+      if (!T.checkPin(st, cur)) { msg.textContent = 'Current PIN is incorrect.'; msg.className = 'muted small orgmsg bad'; return; }
+      const res = T.setPin(st, next, 'organizer');
+      if (!res.ok) { msg.textContent = res.error; msg.className = 'muted small orgmsg bad'; return; }
+      T.save(st);
+      document.getElementById('orgpincur').value = '';
+      document.getElementById('orgpinnew').value = '';
+      msg.textContent = 'PIN changed — the change is audited in the trail.';
+      msg.className = 'muted small orgmsg ok';
+    };
+
+    // (3) Archive & start fresh — resetTournament RETURNS the fresh state
+    document.getElementById('orgreset').onclick = () => {
+      const st = T.ensure();
+      if (!window.confirm('Archive the current tournament and start a fresh one?\nNothing is deleted — the finished state is stored in the archive, and the reset itself is audited.')) return;
+      const fresh = T.resetTournament(st, 'organizer');
+      T.save(fresh);   // resetTournament RETURNS the fresh state — the App persists it
+      orgUnlocked = true;  // stay signed in across the reset (same session)
+      render();
+    };
+
+    // (4) Reset PIN to default (1234) — escape hatch for a lockout; audited
+    document.getElementById('orgresetpin').onclick = () => {
+      if (!window.confirm('Reset the organizer PIN back to the default (1234)?\nThis is the escape hatch if the current PIN is forgotten. It is recorded in the audit trail.')) return;
+      const st = T.ensure();
+      T.resetPin(st, 'organizer');
+      T.save(st);
+      orgUnlocked = false;   // force a re-unlock with the (now default) PIN
+      document.getElementById('orgpin').value = '';
+      render();
+    };
+  }
+
+  // ---------- wiring ----------
+  function wire() {
+    document.querySelectorAll('.tab').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+
+    wireOrg();
+  }
+
+  return { render, wire, setTab };
+})();
+
+// run self-test, then boot the view
+(function boot() {
+  const badge = document.getElementById('selftest');
+  let ok = true, why = '';
+  try { selfTest(); } catch (e) { ok = false; why = e.message; }
+
+  if (ok) {
+    badge.className = 'badge ok';
+    badge.innerHTML = '<span class="dot"></span><span>✓ Self-test passed</span>';
+  } else {
+    badge.className = 'badge bad';
+    badge.innerHTML = '<span class="dot"></span><span>✗ Self-test failed: ' + why + '</span>';
+  }
+
+  App.wire();
+  App.render();
+
+  // Cross-tab live update: if a referee declares in another tab, this one
+  // re-renders automatically (previews the live TV behaviour).
+  window.addEventListener('storage', (e) => { if (e.key === TOURNAMENT.KEY) App.render(); });
+
+  // Poll fallback: some setups (e.g. two separate apps/devices later, or a
+  // tab that misses the `storage` event) won't fire above — so every 2s we
+  // re-read persisted state and re-render only if it actually changed.
+  let lastSnap = '';
+  function liveTick() {
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem(TOURNAMENT.KEY) || 'null'); } catch (e) { s = null; }
+    const snap = s ? (JSON.stringify(s.results) + '|' + (s.audit ? s.audit.length : 0)) : '';
+    if (snap !== lastSnap) { lastSnap = snap; App.render(); }
+  }
+  liveTick();
+  setInterval(liveTick, 2000);
+})();
+</script>
+</body>
+</html>
