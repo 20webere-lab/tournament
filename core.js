@@ -108,6 +108,24 @@
   }
   function save(state) { localStorage.setItem(KEY, JSON.stringify(state)); }
 
+  // A brand-new tournament state, built with NO side effects (no save). Both
+  // the browser's ensure() and the serverless function use this, so the shape
+  // of a fresh tournament has exactly one source of truth.
+  function fresh() {
+    return {
+      version: 1,
+      phase: 'phase1',               // phase1 | tiebreak | phase2 | done
+      teams: TEAMS.slice(),
+      stations: STATIONS,
+      seed: SEED,
+      schedule: generateSchedule(TEAMS.length, STATIONS, mulberry32(SEED)),
+      results: {},                   // "<a>-<b>" -> winner team index
+      audit: [],                     // {t, actor, game, winner, note}
+      archives: [],                  // past tournaments (start-fresh preserves these)
+      pinHash: pinHash(DEFAULT_PIN)  // organizer PIN, stored hashed (never in the clear)
+    };
+  }
+
   function ensure() {
     let state = load();
     if (state && state.pinHash === undefined) {
@@ -117,18 +135,7 @@
       save(state);
     }
     if (!state) {
-      state = {
-        version: 1,
-        phase: 'phase1',               // phase1 | tiebreak | phase2 | done
-        teams: TEAMS.slice(),
-        stations: STATIONS,
-        seed: SEED,
-        schedule: generateSchedule(TEAMS.length, STATIONS, mulberry32(SEED)),
-        results: {},                   // "<a>-<b>" -> winner team index
-        audit: [],                     // {t, actor, game, winner, note}
-        archives: [],                  // past tournaments (start-fresh preserves these)
-        pinHash: pinHash(DEFAULT_PIN)  // organizer PIN, stored hashed (never in the clear)
-      };
+      state = fresh();
       save(state);
     }
     return state;
@@ -431,12 +438,12 @@
   return {
     TEAMS, STATIONS, SEED, KEY,
     mulberry32, shuffle, circleRounds, generateSchedule, validate,
-    ensure, load, save,
+    ensure, load, save, fresh,
     gameKey, stationOf, resultFor, declaredCount, declare,
     phase1Decided, qualification, tiebreakKey, advancement, declareMatch,
     bracket, currentPhase,
     correctResult, resetTournament,
-    DEFAULT_PIN, checkPin, setPin, resetPin,
+    DEFAULT_PIN, pinHash, checkPin, setPin, resetPin,
     standings, latestResults
   };
 });

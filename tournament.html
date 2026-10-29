@@ -51,6 +51,13 @@
   .badge.ok .dot { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
   .badge.bad { color: var(--danger); border-color: #5a2730; background: #241116; }
   .badge.bad .dot { background: var(--danger); }
+  .badge.conn  { color: var(--ok); border-color: #1c4a3b; background: #0f1f1a; }
+  .badge.conn .dot { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .badge.local { color: var(--accent-2); border-color: #274a63; background: #12233a; }
+  .badge.local .dot { background: var(--accent-2); }
+  .badge.offline { color: var(--danger); border-color: #5a2730; background: #241116; }
+  .badge.offline .dot { background: var(--danger); }
+  .badges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
   /* ---- tabs ---- */
   .tabs { display: flex; gap: 8px; margin: 4px 0 14px; }
@@ -236,7 +243,10 @@
         <p>Win/loser scoreboard · integrity model v1</p>
       </div>
     </div>
-    <div id="selftest" class="badge" aria-live="polite"><span class="dot"></span><span>Checking…</span></div>
+    <div class="badges">
+      <div id="conn" class="badge local" aria-live="polite" title="Shared-store connection"><span class="dot"></span><span>Checking…</span></div>
+      <div id="selftest" class="badge" aria-live="polite"><span class="dot"></span><span>Checking…</span></div>
+    </div>
   </header>
 
   <nav class="tabs" role="tablist">
@@ -564,6 +574,97 @@ const App = (() => {
   let picked = null;       // team index pending confirm
   let postPick = null;     // { key, a, b, winner } pending confirm (tiebreak / knockout)
   let orgUnlocked = false; // per-session gate for the organizer console
+  let orgPin = null;       // verified organizer PIN, held in-memory ONLY (never stored)
+
+  // ---------- shared store: server is the SOLE writer when connected ----------
+  // Local (file://) mode: this device's localStorage is the source of truth and
+  // the old ensure()/save() flow is left untouched — the badge/self-test path
+  // is identical. Connected (http/https) mode: the Vercel function is the single
+  // writer; this device reads (localStorage is a read-cache) and writes only via
+  // named ops that the server re-validates through the same core.js. On a failed
+  // connected write the action is NOT applied locally and the cache is NOT
+  // touched, so we never report a win that the server never recorded.
+  function setConn(kind) {
+    const el = document.getElementById('conn');
+    if (!el) return;
+    el.className = 'badge ' + (kind === 'connected' ? 'conn'
+      : kind === 'offline' ? 'offline' : 'local');
+    el.querySelector('span:last-child').textContent =
+      kind === 'connected' ? 'Connected · shared'
+      : kind === 'offline' ? 'Server unreachable' : 'Local only';
+    el.title = kind === 'connected'
+      ? 'Synced with the shared store — every referee device sees the same results.'
+      : kind === 'offline'
+        ? 'The shared store is not reachable. Writes will fail until the connection returns.'
+        : 'Opening the file directly: results stay on THIS device only. Serve over http(s) to share with referees.';
+  }
+  const Store = (() => {
+    const connected = (location.protocol === 'http:' || location.protocol === 'https:');
+    const ENDPOINT = 'api/tournament';   // same-origin relative path
+    let lastRev = null;
+
+    function adopt(state) {
+      // Mirror the server's state into the local read-cache so the render path
+      // (which reads T.ensure()/localStorage) always shows the last known good.
+      try { localStorage.setItem(T.KEY, JSON.stringify(state)); } catch (e) { /* private mode */ }
+      lastRev = state.rev;
+    }
+
+    // Apply one named action. `op` is the server op object; `fallback(st)`
+    // performs the same mutation against a local `state` (used in local mode).
+    // Returns a Promise<{ok, error?, fresh?}>.
+    async function apply(op, fallback) {
+      if (!connected) {
+        const st = T.ensure();
+        const r = fallback(st);
+        if (!r.ok) return r;
+        T.save(r.fresh || st);
+        lastRev = (r.fresh || st).rev;
+        return r;
+      }
+      let res;
+      try {
+        res = await fetch(ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ op })
+        });
+      } catch (e) {
+        setConn('offline');
+        return { ok: false, error: 'Could not reach the server — try again.' };
+      }
+      let data;
+      try { data = await res.json(); } catch (e) { data = { ok: false }; }
+      if (res.status === 200 && data && data.ok && data.state) {
+        setConn('connected');
+        adopt(data.state);
+        return { ok: true };
+      }
+      if (res.status === 503 || res.status >= 500) setConn('offline');
+      else setConn('connected');
+      return { ok: false, error: (data && data.error) || ('server error ' + res.status) };
+    }
+
+    // Poll the shared store: pull the latest state when it changed.
+    async function refresh() {
+      if (!connected) return;
+      let res;
+      try { res = await fetch(ENDPOINT, { method: 'GET' }); }
+      catch (e) { setConn('offline'); return; }
+      let data;
+      try { data = await res.json(); } catch (e) { return; }
+      if (res.status === 200 && data && data.state) {
+        setConn('connected');
+        if (data.state.rev !== lastRev) { adopt(data.state); render(); }
+      } else if (res.status === 503) {
+        setConn('offline');   // store not configured yet — keep last cache
+      }
+      // 202 (empty / creating): nothing to pull yet; a referee can still be the
+      // first writer. We keep whatever the local cache already holds.
+    }
+
+    return { connected, apply, refresh, adopt };
+  })();
 
   // ---------- tabs ----------
   function setTab(name) {
@@ -857,12 +958,12 @@ const App = (() => {
       msg.innerHTML = `<span>${Tms[postPick.winner]} selected. </span>
         <button class="btn primary" id="postok">Confirm ${Tms[postPick.winner]} wins</button>
         <button class="btn ghost" id="postcancel">Cancel</button>`;
-      document.getElementById('postok').onclick = () => {
-        const st = T.ensure();
+      document.getElementById('postok').onclick = async () => {
         const label = postPick.key.indexOf('tb-') === 0 ? 'tiebreak' : 'knockout';
-        const res = T.declareMatch(st, postPick.key, postPick.a, postPick.b, postPick.winner, 'referee', label);
+        const key = postPick.key, a = postPick.a, b = postPick.b, w = postPick.winner;
+        const op = { op: 'declareMatch', key: key, a: a, b: b, winnerIdx: w, actor: 'referee', label: label };
+        const res = await Store.apply(op, st => T.declareMatch(st, key, a, b, w, 'referee', label));
         if (!res.ok) { alert('Could not record: ' + res.error); return; }
-        T.save(st);
         postPick = null;
         render();
       };
@@ -872,14 +973,13 @@ const App = (() => {
     }
   }
 
-  function confirmDeclare(a, b) {
+  async function confirmDeclare(a, b) {
     if (picked == null) return;
     const winner = picked;
     const actor = 'station R' + (rRound + 1) + 'S' + (rStation + 1);
-    const state = T.ensure();
-    const res = T.declare(state, rRound, rStation, winner, actor);
+    const op = { op: 'declare', roundIdx: rRound, stationIdx: rStation, winnerIdx: winner, actor: actor };
+    const res = await Store.apply(op, st => T.declare(st, rRound, rStation, winner, actor));
     if (!res.ok) { alert('Could not record: ' + res.error); return; }
-    T.save(state);   // App layer persists (core is pure / side-effect free)
     picked = null;
     render();
   }
@@ -1023,11 +1123,11 @@ const App = (() => {
       body.innerHTML = `<p class="muted small" style="margin-bottom:10px;">Currently: <b>${Tms[w]}</b> won. Any change is audited with the previous winner.</p>
         <div class="pinrow" style="margin-bottom:10px;">${btn(m.a)}${btn(m.b)}</div>
         <p class="muted small orgmsg" id="orgcorrmsg" role="alert" hidden></p>`;
-      body.querySelectorAll('[data-w]').forEach(b => b.onclick = () => {
-        const st = T.ensure();
-        const res = T.correctResult(st, m.key, m.a, m.b, +b.dataset.w, 'organizer');
+      body.querySelectorAll('[data-w]').forEach(b => b.onclick = async () => {
+        const nw = +b.dataset.w;
+        const op = { op: 'correct', key: m.key, a: m.a, b: m.b, newWinner: nw, pin: orgPin };
+        const res = await Store.apply(op, st => T.correctResult(st, m.key, m.a, m.b, nw, 'organizer'));
         if (!res.ok) { const el = document.getElementById('orgcorrmsg'); if (el) { el.hidden = false; el.textContent = res.error; } return; }
-        T.save(st);
         render();
       });
     }
@@ -1047,6 +1147,7 @@ const App = (() => {
       const err = document.getElementById('orgerr');
       if (T.checkPin(st, pinEl.value)) {
         orgUnlocked = true;
+        orgPin = pinEl.value;   // hold the verified PIN in-memory for gated ops
         pinEl.value = '';
         err.hidden = true;
         renderOrganizer();
@@ -1059,16 +1160,18 @@ const App = (() => {
     document.getElementById('orgpin').onkeydown = e => { if (e.key === 'Enter') unlock(); };
 
     // (2) Change the PIN — audited, hash-only storage
-    document.getElementById('orgpinbtn').onclick = () => {
-      const st = T.ensure();
+    document.getElementById('orgpinbtn').onclick = async () => {
       const cur = document.getElementById('orgpincur').value;
       const next = document.getElementById('orgpinnew').value;
       const msg = document.getElementById('orgpinmsg');
       msg.hidden = false;
-      if (!T.checkPin(st, cur)) { msg.textContent = 'Current PIN is incorrect.'; msg.className = 'muted small orgmsg bad'; return; }
-      const res = T.setPin(st, next, 'organizer');
+      const op = { op: 'setPin', next: next, pin: cur };
+      const res = await Store.apply(op, st => {
+        if (!T.checkPin(st, cur)) return { ok: false, error: 'Current PIN is incorrect.' };
+        return T.setPin(st, next, 'organizer');
+      });
       if (!res.ok) { msg.textContent = res.error; msg.className = 'muted small orgmsg bad'; return; }
-      T.save(st);
+      orgPin = next;   // the verified PIN is now the new one
       document.getElementById('orgpincur').value = '';
       document.getElementById('orgpinnew').value = '';
       msg.textContent = 'PIN changed — the change is audited in the trail.';
@@ -1076,22 +1179,23 @@ const App = (() => {
     };
 
     // (3) Archive & start fresh — resetTournament RETURNS the fresh state
-    document.getElementById('orgreset').onclick = () => {
-      const st = T.ensure();
+    document.getElementById('orgreset').onclick = async () => {
       if (!window.confirm('Archive the current tournament and start a fresh one?\nNothing is deleted — the finished state is stored in the archive, and the reset itself is audited.')) return;
-      const fresh = T.resetTournament(st, 'organizer');
-      T.save(fresh);   // resetTournament RETURNS the fresh state — the App persists it
-      orgUnlocked = true;  // stay signed in across the reset (same session)
+      const op = { op: 'reset', pin: orgPin };
+      const res = await Store.apply(op, st => ({ ok: true, fresh: T.resetTournament(st, 'organizer') }));
+      if (!res.ok) { alert('Could not start fresh: ' + res.error); return; }
+      orgUnlocked = true;  // stay signed in across the reset (same session); PIN is preserved
       render();
     };
 
     // (4) Reset PIN to default (1234) — escape hatch for a lockout; audited
-    document.getElementById('orgresetpin').onclick = () => {
+    document.getElementById('orgresetpin').onclick = async () => {
       if (!window.confirm('Reset the organizer PIN back to the default (1234)?\nThis is the escape hatch if the current PIN is forgotten. It is recorded in the audit trail.')) return;
-      const st = T.ensure();
-      T.resetPin(st, 'organizer');
-      T.save(st);
+      const op = { op: 'resetPin' };
+      const res = await Store.apply(op, st => T.resetPin(st, 'organizer'));
+      if (!res.ok) { alert('Could not reset the PIN: ' + res.error); return; }
       orgUnlocked = false;   // force a re-unlock with the (now default) PIN
+      orgPin = null;         // the held PIN is now stale
       document.getElementById('orgpin').value = '';
       render();
     };
@@ -1104,7 +1208,7 @@ const App = (() => {
     wireOrg();
   }
 
-  return { render, wire, setTab };
+  return { render, wire, setTab, Store, setConn };
 })();
 
 // run self-test, then boot the view
@@ -1122,24 +1226,37 @@ const App = (() => {
   }
 
   App.wire();
-  App.render();
 
   // Cross-tab live update: if a referee declares in another tab, this one
-  // re-renders automatically (previews the live TV behaviour).
+  // re-renders automatically (previews the live TV behaviour). Still useful in
+  // local mode, and harmless alongside the server poll in connected mode.
   window.addEventListener('storage', (e) => { if (e.key === TOURNAMENT.KEY) App.render(); });
 
-  // Poll fallback: some setups (e.g. two separate apps/devices later, or a
-  // tab that misses the `storage` event) won't fire above — so every 2s we
-  // re-read persisted state and re-render only if it actually changed.
-  let lastSnap = '';
-  function liveTick() {
-    let s = null;
-    try { s = JSON.parse(localStorage.getItem(TOURNAMENT.KEY) || 'null'); } catch (e) { s = null; }
-    const snap = s ? (JSON.stringify(s.results) + '|' + (s.audit ? s.audit.length : 0)) : '';
-    if (snap !== lastSnap) { lastSnap = snap; App.render(); }
+  if (App.Store.connected) {
+    // CONNECTED (http/https): the server is the shared source of truth. Pull
+    // the current event before first paint, then keep polling the server so
+    // every referee device and the TV converge on the same results.
+    App.setConn('local');                 // "Checking…" until the first answer
+    (async function init() {
+      await App.Store.refresh();          // adopts + renders if the store has data
+      App.render();
+      setInterval(() => App.Store.refresh(), 2000);
+    })();
+  } else {
+    // LOCAL (file://): this device only — keep the honest "local only" badge and
+    // the localStorage poll that previews cross-tab live updates.
+    App.setConn('local');
+    App.render();
+    let lastSnap = '';
+    function liveTick() {
+      let s = null;
+      try { s = JSON.parse(localStorage.getItem(TOURNAMENT.KEY) || 'null'); } catch (e) { s = null; }
+      const snap = s ? (JSON.stringify(s.results) + '|' + (s.audit ? s.audit.length : 0)) : '';
+      if (snap !== lastSnap) { lastSnap = snap; App.render(); }
+    }
+    liveTick();
+    setInterval(liveTick, 2000);
   }
-  liveTick();
-  setInterval(liveTick, 2000);
 })();
 </script>
 </body>
